@@ -1,0 +1,29 @@
+{
+  "name": "site",
+  "version": "1.0.0",
+  "description": "JS for AuthCORE",
+  "private": true,
+  "scripts": {
+    "buildSignin": "npx webpack --config signinApp.webpack.config.js",
+    "buildSignout": "npx webpack --config signoutApp.webpack.config.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "webpack": "^4.41.6",
+    "webpack-cli": "^3.3.12"
+  },
+  "dependencies": {
+    "firebase": "^8.3.0",
+    "jquery": "^3.4.1",
+    "navigo": "^7.1.3",
+    "template7": "^1.4.2",
+    "toastr": "^2.1.4"
+  },
+  "standard": {
+    "globals": [
+      "$"
+    ]
+  }
+}
