@@ -84,12 +84,16 @@ const listAllUsers = async (nextPageToken,users=[]) => {
       console.log("No credential provided, rejecting")
       return res.status(403).send({
         status: false,
-        statusRason: "No credentials provided"
+        statusReason: "No credentials provided"
       });
     }
   }
   app.get('/adminApi/users', verifyAdminIdToken, async (req, res) => {
-  res.send(await listAllUsers());
+  res.send({
+    status: true,
+    statusReason: "Provided list of users from auth",
+    users: await listAllUsers()
+  });
 })
 
 app.get('/', (req, res) => {
