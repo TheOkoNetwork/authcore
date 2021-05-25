@@ -1,6 +1,10 @@
 const express = require('express')
 const app = express()
 app.use(express.json());
+const cors = require('cors')
+app.use(cors())
+app.options('*', cors())
+
 const port = process.env.PORT || 3000;
 const fs = require('fs');
 
@@ -14,7 +18,7 @@ try {
         } else {
                 console.log("Not running under cloud run");
   admin.initializeApp({
-    credential: admin.credential.cert(require('./serviceAccountKey.json')),
+    credential: admin.credential.cert(require('/home/codespace/serviceAccountKey.json')),
     databaseURL: "https://parkplanr-dev.firebaseio.com",
   });
         };
@@ -29,6 +33,64 @@ const authManager = admin.auth();
 
 
 app.use(express.static('public'))
+
+const listAllUsers = async (nextPageToken,users=[]) => {
+    console.log("Listing users");
+    const listUsersResult = await admin
+      .auth()
+      .listUsers(1000, nextPageToken)
+        listUsersResult.users.forEach((userRecord,index) => {
+          const user = ({...userRecord});
+          //There's zero reason for this to be provided so we remove it
+          delete(user.passwordHash);
+          delete(user.passwordSalt);
+          users.push(user);
+        });
+        if (listUsersResult.pageToken) {
+          return listAllUsers(listUsersResult.pageToken, user);
+        } else {
+          return users;
+        }
+  };
+
+  const verifyAdminIdToken = async function (req, res, next) {
+    const bearerHeader = req.headers['authorization'];
+  
+    if (bearerHeader) {
+      const bearer = bearerHeader.split(' ');
+      const bearerToken = bearer[1];
+      req.token = bearerToken;
+      let idTokenResult;
+      try {
+        idTokenResult = await admin.auth().verifyIdToken(req.token,true);
+      } catch (error) {
+        console.log(`Firebase ID Token verification failed with error: ${error}`)
+        console.log("Treating as invalid credential-rejecting")
+        return res.status(403).send({
+          status: false,
+          statusReason: "Invalid credentials"
+        })
+      }
+      if (!idTokenResult.admin) {
+        console.log("Valid credential, missing required claim-rejecting")
+        return res.status(403).send({
+          status: false,
+          statusReason: "Not an admin"
+        })
+      };    
+      console.log("Valid credential, has required claim-accepting")
+      return next();
+    } else {
+      console.log("No credential provided, rejecting")
+      return res.status(403).send({
+        status: false,
+        statusRason: "No credentials provided"
+      });
+    }
+  }
+  app.get('/adminApi/users', verifyAdminIdToken, async (req, res) => {
+  res.send(await listAllUsers());
+})
 
 app.get('/', (req, res) => {
   res.redirect('/signin');
