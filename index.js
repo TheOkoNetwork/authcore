@@ -99,6 +99,9 @@ const listAllUsers = async (nextPageToken,users=[]) => {
 app.get('/', (req, res) => {
   res.redirect('/signin');
 })
+app.get('/serviceConfig', (req, res) => {
+  res.send(JSON.parse(process['env']['SERVICE_CONFIG']));
+})
 
 app.get('/signin', async function(req,res){
   localFilePath = `${__dirname}/public/signin.html`;
