@@ -15,11 +15,11 @@ const init = async () => {
 
   console.table(config())
 
-  const serviceConfigResponse = await window.fetch("/serviceConfig");
-  const serviceConfig = await serviceConfigResponse.json();
-  console.table(serviceConfig);
+  const serviceConfigResponse = await window.fetch('/serviceConfig')
+  const serviceConfig = await serviceConfigResponse.json()
+  console.table(serviceConfig)
 
-  $('title').text(serviceConfig['serviceName'])
+  $('title').text(serviceConfig.serviceName)
   const response = await window.fetch('/__/firebase/init.json')
   const firebaseConfig = await response.json()
   console.table(firebaseConfig)
@@ -72,11 +72,11 @@ const init = async () => {
           return
         }
         console.log(`Invalid domain for service: ${service}`)
-        window.localStorage.service = serviceConfig['defaultService']
+        window.localStorage.service = serviceConfig.defaultService
       }
     } else {
       console.log('No service detected, defaulting url.')
-      window.localStorage.service = serviceConfig['defaultService']
+      window.localStorage.service = serviceConfig.defaultService
     }
   }
 

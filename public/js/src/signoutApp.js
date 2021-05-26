@@ -1,72 +1,63 @@
-import { config } from "./config.js";
-const $ = window.$;
+import { config } from './config.js'
+const $ = window.$
 
-const firebase = require("firebase/app").default;
-require("firebase/auth");
+const firebase = require('firebase/app').default
+require('firebase/auth')
 
-window.firebase = firebase;
+window.firebase = firebase
 
-const toastr = require("toastr");
-toastr.options.fadeOut = 7500;
-window.toastr = toastr;
+const toastr = require('toastr')
+toastr.options.fadeOut = 7500
+window.toastr = toastr
 
 const init = async () => {
-  console.log(`I am running on version: ${config("version")}`);
+  console.log(`I am running on version: ${config('version')}`)
 
-  console.table(config());
+  console.table(config())
 
-  const serviceConfigResponse = await window.fetch("/serviceConfig");
-  const serviceConfig = await serviceConfigResponse.json();
-  console.table(serviceConfig);
+  const serviceConfigResponse = await window.fetch('/serviceConfig')
+  const serviceConfig = await serviceConfigResponse.json()
+  console.table(serviceConfig)
 
-  $("title").text(serviceConfig["serviceName"]);
+  $('title').text(serviceConfig.serviceName)
 
-  const firebaseConfigResponse = await window.fetch("/__/firebase/init.json");
-  const firebaseConfig = await firebaseConfigResponse.json();
-  console.table(firebaseConfig);
+  const firebaseConfigResponse = await window.fetch('/__/firebase/init.json')
+  const firebaseConfig = await firebaseConfigResponse.json()
+  console.table(firebaseConfig)
 
-  firebase.initializeApp(firebaseConfig);
-  console.log(firebase.auth());
+  firebase.initializeApp(firebaseConfig)
+  console.log(firebase.auth())
 
-  console.log("Signing out");
-$("title").text(serviceConfig["serviceName"]);
+  console.log('Signing out')
 
-  const firebaseConfigResponse = await window.fetch("/__/firebase/init.json");
-  const firebaseConfig = await firebaseConfigResponse.json();
-  console.table(firebaseConfig);
-
-  firebase.initializeApp(firebaseConfig);
-  console.log(firebase.auth());
-
-  console.log("Signing out");
-  await firebase.auth().signOut();
-  let service = "";
-  const domain = window.location.hostname.split("auth.")[1];
-  const serviceSplit = window.location.hash.split("service=");
+  await firebase.auth().signOut()
+  let service = ''
+  const domain = window.location.hostname.split('auth.')[1]
+  const serviceSplit = window.location.hash.split('service=')
   if (serviceSplit.length > 1) {
-    service = serviceSplit[1].split("&")[0];
+    service = serviceSplit[1].split('&')[0]
   }
   if (service) {
-    console.log(`Detected service: ${service}`);
+    console.log(`Detected service: ${service}`)
     if (
-      service.replace(/[^0-9-a-z.]/gi, "").endsWith(`.${domain}`) ||
+      service.replace(/[^0-9-a-z.]/gi, '').endsWith(`.${domain}`) ||
       service === domain
     ) {
-      console.log("service is valid");
+      console.log('service is valid')
     } else {
-      if (service === "localhost") {
-        console.log("Localhost, treating as valid service");
+      if (service === 'localhost') {
+        console.log('Localhost, treating as valid service')
       } else {
-        console.log(`Invalid domain for service: ${service}`);
-        service = serviceConfig["defaultService"];
+        console.log(`Invalid domain for service: ${service}`)
+        service = serviceConfig.defaultService
       }
     }
   } else {
-    console.log("No service detected, defaulting url.");
-    service = serviceConfig["defaultService"];
+    console.log('No service detected, defaulting url.')
+    service = serviceConfig.defaultService
   }
-  const redirectUrl = `https://${service}/signout?#signout=signout`;
-  console.log(`Using redirect Url: ${redirectUrl}`);
-  window.location.href = redirectUrl;
-};
-init();
+  const redirectUrl = `https://${service}/signout?#signout=signout`
+  console.log(`Using redirect Url: ${redirectUrl}`)
+  window.location.href = redirectUrl
+}
+init()
