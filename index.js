@@ -34,6 +34,18 @@ const authManager = admin.auth();
 
 app.use(express.static('public'))
 
+const sgMail = require('@sendgrid/mail')
+const getSMSecret = require('./getSecret'); 
+const getTemplate = require('./getSendgridTemplate'); 
+
+const initApp = async() => {
+  console.log("Fetching secrets");
+  sgMail.setApiKey(await getSMSecret("sendgridApiKey"))
+
+  app.listen(port, () => {
+    console.log(`AuthCORE listening at http://0.0.0.0:${port}`)
+  })
+}
 const listAllUsers = async (nextPageToken,users=[]) => {
     console.log("Listing users");
     const listUsersResult = await admin
@@ -51,6 +63,44 @@ const listAllUsers = async (nextPageToken,users=[]) => {
         } else {
           return users;
         }
+  };
+
+
+  const fetchUser = async (uid) => {
+    console.log(`Fetching user: ${uid}`);
+    const userFetchResult = await admin.auth().getUser(uid);
+    console.log(userFetchResult);
+    return userFetchResult;
+  };
+  const resetPassword = async (uid) => {
+    console.log(`Fetching user: ${uid} for password reset`);
+    const userFetchResult = await admin.auth().getUser(uid);
+    console.log(userFetchResult);
+    if (!userFetchResult.email) {
+      console.log("User does not have an email address on record.");
+      return {
+        status: false,
+        statusReason: "No email address for user",
+      }
+    }
+    const resetUrl = await admin.auth().generatePasswordResetLink(userFetchResult.email);
+    console.log(`Fetched reset link: ${resetUrl}`);
+
+    const template = await getTemplate("PASSWORD_RESET");
+    const msg = {
+      to: userFetchResult.email,
+      from: template['fromEmail'],
+      templateId: template['templateId'],
+      dynamic_template_data: {
+        "RESET_URL": resetUrl,
+        }
+    };
+    await sgMail.send(msg);
+
+    return {
+      status: true,
+      statusReason: "Sent user password reset email"
+    };
   };
 
   const verifyAdminIdToken = async function (req, res, next) {
@@ -88,12 +138,26 @@ const listAllUsers = async (nextPageToken,users=[]) => {
       });
     }
   }
-  app.get('/adminApi/users', verifyAdminIdToken, async (req, res) => {
+
+app.get('/adminApi/users', verifyAdminIdToken, async (req, res) => {
   res.send({
     status: true,
     statusReason: "Provided list of users from auth",
     users: await listAllUsers()
   });
+})
+
+app.get('/adminApi/users/:uid', verifyAdminIdToken, async (req, res) => {
+  res.send({
+    status: true,
+    statusReason: "Provided user data from auth",
+    user: await fetchUser(req.params.uid)
+  });
+})
+app.get('/adminApi/users/:uid/resetPassword', verifyAdminIdToken, async (req, res) => {
+  const resetResult = await resetPassword(req.params.uid);
+  console.log(resetResult);
+  res.send(resetResult);
 })
 
 app.get('/', (req, res) => {
@@ -173,6 +237,5 @@ app.get('/__/firebase/init.json', async function(req,res){
   res.send(JSON.parse(process.env['FIREBASE_INIT_JSON']));
 });
 
-app.listen(port, () => {
-  console.log(`AuthCORE listening at http://0.0.0.0:${port}`)
-})
+
+initApp();
