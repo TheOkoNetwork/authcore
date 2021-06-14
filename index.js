@@ -26,6 +26,7 @@ try {
         console.log(e);
   // yes this is meant to be empty
 }
+const db = admin.firestore();
 
 //const tenantManager = admin.auth().tenantManager();
 //const tenantAuth = tenantManager.authForTenant('authTenantId');
@@ -72,6 +73,7 @@ const listAllUsers = async (nextPageToken,users=[]) => {
     console.log(userFetchResult);
     return userFetchResult;
   };
+
   const resetPassword = async (uid) => {
     console.log(`Fetching user: ${uid} for password reset`);
     const userFetchResult = await admin.auth().getUser(uid);
@@ -103,6 +105,68 @@ const listAllUsers = async (nextPageToken,users=[]) => {
     };
   };
 
+  const blockUser = async (uid,blockingAdmin,reason) => {
+    console.log(`Blocking user: ${uid} with reason: ${reason}`);
+    const userFetchResult = await admin.auth().getUser(uid);
+    console.log(userFetchResult);
+
+    const blockPromises = [
+      db.collection("users").doc(uid).collection("adminNotes").doc().set({
+        admin: blockingAdmin,
+        type: "action",
+        action: "USER_BLOCK",
+        comment: reason,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      }),
+      admin.auth().updateUser(uid, {
+        disabled: true
+      })
+    ];
+    await Promise.all(blockPromises);
+    return {
+      status: true,
+      statusReason: "Successfully blocked user"
+    };
+  };
+  const unblockUser = async (uid,unblockingAdmin,reason) => {
+    console.log(`Unblocking user: ${uid} with reason: ${reason}`);
+    const userFetchResult = await admin.auth().getUser(uid);
+    console.log(userFetchResult);
+
+    const unblockPromises = [
+      db.collection("users").doc(uid).collection("adminNotes").doc().set({
+        admin: unblockingAdmin,
+        type: "action",
+        action: "USER_UNBLOCK",
+        comment: reason,
+        timestamp: admin.firestore.FieldValue.serverTimestamp()
+      }),
+      admin.auth().updateUser(uid, {
+        disabled: false
+      })
+    ];
+    await Promise.all(unblockPromises);
+    return {
+      status: true,
+      statusReason: "Successfully unblocked user"
+    };
+  };
+
+  const deleteUser = async (uid) => {
+    console.log(`Deleting user: ${uid}`);
+    const userFetchResult = await admin.auth().getUser(uid);
+    console.log(userFetchResult);
+
+    await admin.auth().deleteUser(uid);
+
+    return {
+      status: true,
+      statusReason: "Successfully deleted user"
+    };
+  };
+
+
+
   const verifyAdminIdToken = async function (req, res, next) {
     const bearerHeader = req.headers['authorization'];
   
@@ -129,6 +193,7 @@ const listAllUsers = async (nextPageToken,users=[]) => {
         })
       };    
       console.log("Valid credential, has required claim-accepting")
+      res.locals.adminUid = idTokenResult.uid;
       return next();
     } else {
       console.log("No credential provided, rejecting")
@@ -158,6 +223,21 @@ app.get('/adminApi/users/:uid/resetPassword', verifyAdminIdToken, async (req, re
   const resetResult = await resetPassword(req.params.uid);
   console.log(resetResult);
   res.send(resetResult);
+})
+app.post('/adminApi/users/:uid/block', verifyAdminIdToken, async (req, res) => {
+  const blockResult = await blockUser(req.params.uid,res.locals.adminUid,req.body.reason);
+  console.log(blockResult);
+  res.send(blockResult);
+})
+app.post('/adminApi/users/:uid/unblock', verifyAdminIdToken, async (req, res) => {
+  const blockResult = await unblockUser(req.params.uid,res.locals.adminUid,req.body.reason);
+  console.log(blockResult);
+  res.send(blockResult);
+})
+app.post('/adminApi/users/:uid/delete', verifyAdminIdToken, async (req, res) => {
+  const deleteResult = await deleteUser(req.params.uid);
+  console.log(deleteResult);
+  res.send(deleteResult);
 })
 
 app.get('/', (req, res) => {
