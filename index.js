@@ -67,14 +67,24 @@ const listAllUsers = async (nextPageToken,users=[]) => {
   };
 
 
-  const fetchUser = async (uid) => {
+  const fetchUser = async (uid,adminId) => {
     console.log(`Fetching user: ${uid}`);
     const userFetchResult = await admin.auth().getUser(uid);
     console.log(userFetchResult);
+    
+    await db.collection("users").doc(uid).collection("adminNotes").doc().set({
+      admin: adminId,
+      type: "action",
+      action: "USER_VIEW",
+      comment: `Admin viewed user profile`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    })
+
+
     return userFetchResult;
   };
 
-  const resetPassword = async (uid) => {
+  const resetPassword = async (uid,adminUid) => {
     console.log(`Fetching user: ${uid} for password reset`);
     const userFetchResult = await admin.auth().getUser(uid);
     console.log(userFetchResult);
@@ -99,11 +109,41 @@ const listAllUsers = async (nextPageToken,users=[]) => {
     };
     await sgMail.send(msg);
 
+    await db.collection("users").doc(uid).collection("adminNotes").doc().set({
+      admin: adminUid,
+      type: "action",
+      action: "USER_PASSWORD_RESET",
+      comment: `Admin sent user a password reset email`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    })
+
     return {
       status: true,
       statusReason: "Sent user password reset email"
     };
   };
+
+  const setClaims = async (uid,claims,adminUid) => {
+    console.log(`Setting claims: ${JSON.stringify(claims)} user: ${uid}`);
+    const userFetchResult = await admin.auth().getUser(uid);
+    console.log(userFetchResult);
+
+    await admin.auth().setCustomUserClaims(uid, claims)
+ 
+    await db.collection("users").doc(uid).collection("adminNotes").doc().set({
+      admin: adminUid,
+      type: "action",
+      action: "USER_SET_CLAIMS",
+      comment: `Set users claims to: ${claims}`,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    })
+
+    return {
+      status: true,
+      statusReason: `Successfully updated claims for user, ${userFetchResult.displayName} will to either sign out and back in or wait 1 hour`
+    };
+  };
+  
 
   const blockUser = async (uid,blockingAdmin,reason) => {
     console.log(`Blocking user: ${uid} with reason: ${reason}`);
@@ -128,6 +168,7 @@ const listAllUsers = async (nextPageToken,users=[]) => {
       statusReason: "Successfully blocked user"
     };
   };
+
   const unblockUser = async (uid,unblockingAdmin,reason) => {
     console.log(`Unblocking user: ${uid} with reason: ${reason}`);
     const userFetchResult = await admin.auth().getUser(uid);
@@ -165,8 +206,42 @@ const listAllUsers = async (nextPageToken,users=[]) => {
     };
   };
 
-
-
+  const verifyClaimsAdminIdToken = async function (req, res, next) {
+    const bearerHeader = req.headers['authorization'];
+  
+    if (bearerHeader) {
+      const bearer = bearerHeader.split(' ');
+      const bearerToken = bearer[1];
+      req.token = bearerToken;
+      let idTokenResult;
+      try {
+        idTokenResult = await admin.auth().verifyIdToken(req.token,true);
+      } catch (error) {
+        console.log(`Firebase ID Token verification failed with error: ${error}`)
+        console.log("Treating as invalid credential-rejecting")
+        return res.status(403).send({
+          status: false,
+          statusReason: "Invalid credentials"
+        })
+      }
+      if (!idTokenResult.claimsAdmin) {
+        console.log("Valid credential, missing required claim-rejecting")
+        return res.status(403).send({
+          status: false,
+          statusReason: "Not an admin"
+        })
+      };    
+      console.log("Valid credential, has required claim-accepting")
+      res.locals.adminUid = idTokenResult.uid;
+      return next();
+    } else {
+      console.log("No credential provided, rejecting")
+      return res.status(403).send({
+        status: false,
+        statusReason: "No credentials provided"
+      });
+    }
+  }
   const verifyAdminIdToken = async function (req, res, next) {
     const bearerHeader = req.headers['authorization'];
   
@@ -216,13 +291,19 @@ app.get('/adminApi/users/:uid', verifyAdminIdToken, async (req, res) => {
   res.send({
     status: true,
     statusReason: "Provided user data from auth",
-    user: await fetchUser(req.params.uid)
+    user: await fetchUser(req.params.uid,res.locals.adminUid)
   });
 })
 app.get('/adminApi/users/:uid/resetPassword', verifyAdminIdToken, async (req, res) => {
-  const resetResult = await resetPassword(req.params.uid);
+  const resetResult = await resetPassword(req.params.uid,res.locals.adminUid);
   console.log(resetResult);
   res.send(resetResult);
+})
+
+app.post('/adminApi/users/:uid/claims', verifyClaimsAdminIdToken, async (req, res) => {
+  const claimsSetResult = await setClaims(req.params.uid,req.body.claims,res.locals.adminUid);
+  console.log(claimsSetResult);
+  res.send(claimsSetResult);
 })
 app.post('/adminApi/users/:uid/block', verifyAdminIdToken, async (req, res) => {
   const blockResult = await blockUser(req.params.uid,res.locals.adminUid,req.body.reason);
