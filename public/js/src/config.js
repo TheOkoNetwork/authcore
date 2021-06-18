@@ -1,8 +1,6 @@
 export function config (key) {
   const configStore = {}
   configStore.version = '{{APP_VERSION_HERE}}'
-  configStore.defaultService = 'dev.parkplanr.app'
-  configStore.serviceName = "ParkPlanr"
 
   if (!key) {
     return configStore
