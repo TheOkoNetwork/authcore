@@ -9,7 +9,7 @@
   "author": "Gregory Oakley-Stevenson <gregory@okonetwork.org.uk>",
   "license": "ISC",
   "dependencies": {
-    "@google-cloud/secret-manager": "^3.7.2",
+    "@google-cloud/secret-manager": "^3.7.3",
     "@sendgrid/mail": "^7.4.5",
     "cors": "^2.8.5",
     "express": "^4.17.1",
